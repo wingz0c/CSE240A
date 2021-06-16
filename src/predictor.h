@@ -29,7 +29,8 @@ extern const char *email;
 #define STATIC      0
 #define GSHARE      1
 #define TOURNAMENT  2
-#define CUSTOM      3
+#define TOURNAMENT2  3
+#define CUSTOM      4
 extern const char *bpName[];
 
 // Definitions for 2-bit counters
