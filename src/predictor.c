@@ -6,6 +6,7 @@
 //  described in the README                               //
 //========================================================//
 #include <stdio.h>
+#include <stdbool.h> 
 #include "predictor.h"
 
 //
@@ -183,8 +184,8 @@ init_predictor()
     // Given the history length and table size, construct the ghr
     // and perceptron table.
       perceptronSteps = 0;
-      size = 1<<59;
-      ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
+      size = 1UL<<59;
+      ghr = (unsigned long*) malloc(sizeof(unsigned long)*size);
 
       // Initialize each entry in the perceptron table to a value of
       // zero. Initialize number of steps executed for each perceptron to zero.
@@ -220,7 +221,6 @@ uint8_t make_prediction(uint32_t pc)
   uint32_t lhist;
   uint32_t ghistbits;
   uint32_t perceptronIndex;
-  uint32_t prediction;
   // Make a prediction based on the bpType
   switch (bpType) {
     case STATIC:
@@ -489,7 +489,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
       }	   
 
       // update the GHR by shifting left and setting new bit.
-      ghr = (ghr << 1);
+      ghr = (ghr << 1UL);
       if(resolveDir == TAKEN){
         ghr++;}
       return;
