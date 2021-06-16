@@ -76,7 +76,7 @@ uint32_t make_mask(uint32_t size)
   return mmask;
 }
 
-uint32_t HashPC(UINT32 pc){
+uint32_t HashPC(uint32_t pc){
 	
 	// Hash the PC so that it can be used as an index for the perceptron table.
 	uint32_t PCend = PC % TABLE_SIZE;
@@ -91,7 +91,7 @@ init_predictor()
   //
   //TODO: Initialize Branch Predictor Data Structures
   //
-  int size;
+  uint32_t size;
   ghist = 0;
   if(bpType==TOURNAMENT2)
   {
@@ -274,9 +274,9 @@ uint8_t make_prediction(uint32_t pc)
         return NOTTAKEN;
     
     case CUSTOM:
-      uint32_t perceptronIndex = HashPC(pc);
+      uint32_t perceptronIndex 
       uint32_t prediction = 0;
-
+      perceptronIndex = HashPC(pc);
       // Calculate prediction based on selected perceptron and global history.
       // First add the bias, then all other weights.
 
@@ -300,7 +300,7 @@ uint8_t make_prediction(uint32_t pc)
     if(prediction >= 0){
         return TAKEN;}
     else{
-        return NOT_TAKEN;}  
+        return NOTTAKEN;}  
 
     default:
       break;
@@ -437,7 +437,10 @@ train_predictor(uint32_t pc, uint8_t outcome)
       return;
 
     case CUSTOM:
-      uint32_t perceptronIndex = HashPC(pc);
+      uint32_t perceptronIndex;
+      bool resolveDir;
+      bool predDir;
+      perceptronIndex = HashPC(pc);
 
       // Update the perceptron table entry only if the threshold has not been
       // reached or the predicted and true outcomes disagree. Update the bias first, then the weights.
@@ -468,7 +471,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
         // If the branch outcome matches the history bit, increment the weight value.
         // Else, decrement the weight value.
 
-        if((resolveDir == TAKEN && ghr[i - 1] == 1) || (resolveDir == NOT_TAKEN && ghr[i - 1] == 0)){
+        if((resolveDir == TAKEN && ghr[i - 1] == 1) || (resolveDir == NOTTAKEN && ghr[i - 1] == 0)){
           int32_t updateVal = perceptronTable[perceptronIndex][i] + 1;
           if (updateVal > THRESHOLD){
           perceptronTable[perceptronIndex][i] = THRESHOLD;}
