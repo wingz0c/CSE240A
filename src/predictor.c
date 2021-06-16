@@ -184,7 +184,7 @@ init_predictor()
     // Given the history length and table size, construct the ghr
     // and perceptron table.
       perceptronSteps = 0;
-      size = 1UL<<59;
+      size = 1<<HIST_LEN;
       ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
 
       // Initialize each entry in the perceptron table to a value of
