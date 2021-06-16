@@ -79,8 +79,8 @@ uint32_t make_mask(uint32_t size)
 uint32_t HashPC(uint32_t pc){
 	
 	// Hash the PC so that it can be used as an index for the perceptron table.
-	uint32_t PCend = PC % TABLE_SIZE;
-	uint32_t ghrend = ((UINT32)ghr.to_ulong()) % TABLE_SIZE;
+	uint32_t PCend = pc % TABLE_SIZE;
+	uint32_t ghrend = ((uint32_t)ghr.to_ulong()) % TABLE_SIZE;
 	return PCend ^ ghrend;
 }
 // Initialize the predictor
@@ -91,7 +91,7 @@ init_predictor()
   //
   //TODO: Initialize Branch Predictor Data Structures
   //
-  uint32_t size;
+  int size;
   ghist = 0;
   if(bpType==TOURNAMENT2)
   {
@@ -183,7 +183,7 @@ init_predictor()
     // Given the history length and table size, construct the ghr
     // and perceptron table.
       perceptronSteps = 0;
-      size = 1<<HIST_LEN;
+      size = 1<<59;
       ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
 
       // Initialize each entry in the perceptron table to a value of
@@ -219,7 +219,8 @@ uint8_t make_prediction(uint32_t pc)
   uint32_t pcidx;
   uint32_t lhist;
   uint32_t ghistbits;
-
+  uint32_t perceptronIndex;
+  uint32_t prediction;
   // Make a prediction based on the bpType
   switch (bpType) {
     case STATIC:
@@ -274,9 +275,9 @@ uint8_t make_prediction(uint32_t pc)
         return NOTTAKEN;
     
     case CUSTOM:
-      uint32_t perceptronIndex 
-      uint32_t prediction = 0;
+
       perceptronIndex = HashPC(pc);
+      prediction = 0;
       // Calculate prediction based on selected perceptron and global history.
       // First add the bias, then all other weights.
 
@@ -334,7 +335,10 @@ train_predictor(uint32_t pc, uint8_t outcome)
   uint32_t lhist;
   uint32_t lpred;
   uint32_t gpred;
-  
+  uint32_t perceptronIndex;
+  bool resolveDir;
+  bool predDir;
+
   switch(bpType) {
     
     case GSHARE:
@@ -437,9 +441,6 @@ train_predictor(uint32_t pc, uint8_t outcome)
       return;
 
     case CUSTOM:
-      uint32_t perceptronIndex;
-      bool resolveDir;
-      bool predDir;
       perceptronIndex = HashPC(pc);
 
       // Update the perceptron table entry only if the threshold has not been
