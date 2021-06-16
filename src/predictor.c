@@ -185,7 +185,7 @@ init_predictor()
     // and perceptron table.
       perceptronSteps = 0;
       size = 1UL<<59;
-      ghr = (unsigned long*) malloc(sizeof(unsigned long)*size);
+      ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
 
       // Initialize each entry in the perceptron table to a value of
       // zero. Initialize number of steps executed for each perceptron to zero.
@@ -489,7 +489,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
       }	   
 
       // update the GHR by shifting left and setting new bit.
-      ghr = (ghr << 1UL);
+      ghr = (ghr << 1);
       if(resolveDir == TAKEN){
         ghr++;}
       return;
