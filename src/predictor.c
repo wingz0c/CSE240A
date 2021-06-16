@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdbool.h> 
 #include "predictor.h"
+#include <math.h>
 
 //
 // TODO:Student Information
@@ -93,6 +94,8 @@ init_predictor()
   //TODO: Initialize Branch Predictor Data Structures
   //
   int size;
+  unsigned long psize;
+
   ghist = 0;
   if(bpType==TOURNAMENT2)
   {
@@ -184,7 +187,7 @@ init_predictor()
     // Given the history length and table size, construct the ghr
     // and perceptron table.
       perceptronSteps = 0;
-      size = 1<<HIST_LEN;
+      psize = pow(2,59);
       ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
 
       // Initialize each entry in the perceptron table to a value of
