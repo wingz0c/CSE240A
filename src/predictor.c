@@ -18,10 +18,13 @@ const char *email       = "h8chiu@ucsd.edu";
 //------------------------------------//
 //      Predictor Configuration       //
 //------------------------------------//
+#define TABLE_SIZE 1024 // Determined by threshold and history length
+#define THRESHOLD  127 // Floor(1.93 * HIST_LEN + 14) as specified in paper
+#define HIST_LEN   59 // Optimal value as determined by paper
 
 // Handy Global for use in output routines
-const char *bpName[4] = { "Static", "Gshare",
-                          "Tournament", "Custom" };
+const char *bpName[5] = { "Static", "Gshare",
+                          "Tournament","Tournament2", "Custom" };
 
 int ghistoryBits; // Number of bits used for Global History
 int lhistoryBits; // Number of bits used for Local History
@@ -54,12 +57,16 @@ uint32_t *local_pht;
 uint32_t *global_pht;
 uint32_t *choice_pht;
 
+//perceptron
+uint32_t *ghr;           // global history register
+uint32_t perceptronSteps;
+uint32_t perceptronTable[TABLE_SIZE][HIST_LEN + 1]; //table of perceptrons
+
 //------------------------------------//
 //        Predictor Functions         //
 //------------------------------------//
 
-uint32_t
-make_mask(uint32_t size)
+uint32_t make_mask(uint32_t size)
 {
   uint32_t mmask = 0;
   for(int i=0;i<size;i++)
@@ -67,6 +74,14 @@ make_mask(uint32_t size)
     mmask = mmask | 1<<i;
   }
   return mmask;
+}
+
+uint32_t HashPC(UINT32 pc){
+	
+	// Hash the PC so that it can be used as an index for the perceptron table.
+	uint32_t PCend = PC % TABLE_SIZE;
+	uint32_t ghrend = ((UINT32)ghr.to_ulong()) % TABLE_SIZE;
+	return PCend ^ ghrend;
 }
 // Initialize the predictor
 //
@@ -78,7 +93,7 @@ init_predictor()
   //
   int size;
   ghist = 0;
-  if(bpType==CUSTOM)
+  if(bpType==TOURNAMENT2)
   {
     ghistoryBits = 13; // Number of bits used for Global History
     lhistoryBits = 11; // Number of bits used for Local History
@@ -88,10 +103,6 @@ init_predictor()
     //                          + 2^11 x 2  (Local PHT)
     //                          + 2^11 x 11 (Local BHT)
     //                          = 59392 bits < 64000 + 256 bits
-
-    #define TABLE_SIZE 1024 // Determined by threshold and history length
-    #define THRESHOLD  127 // Floor(1.93 * HIST_LEN + 14) as specified in paper
-    #define HIST_LEN   59 // Optimal value as determined by paper
   }
   gmask = make_mask(ghistoryBits);
   lmask = make_mask(lhistoryBits);
@@ -172,13 +183,14 @@ init_predictor()
     // Given the history length and table size, construct the ghr
     // and perceptron table.
       perceptronSteps = 0;
-      ghr = bitset<HIST_LEN>();
+      size = 1<<HIST_LEN;
+      ghr = (uint32_t*) malloc(sizeof(uint32_t)*size);
 
       // Initialize each entry in the perceptron table to a value of
       // zero. Initialize number of steps executed for each perceptron to zero.
 
-      for(UINT32 i=0; i < TABLE_SIZE; i++){
-        for(UINT32 j=0; j < HIST_LEN; j++){
+      for(uint32_t i=0; i < TABLE_SIZE; i++){
+        for(uint32_t j=0; j < HIST_LEN; j++){
           perceptronTable[i][j] = 0;
         }
       }
@@ -269,7 +281,7 @@ uint8_t make_prediction(uint32_t pc)
       // First add the bias, then all other weights.
 
       prediction += perceptronTable[perceptronIndex][0]; 
-      for(UINT32 i=1; i < HIST_LEN + 1; i++){
+      for(uint32_t i=1; i < HIST_LEN + 1; i++){
         // If history bit is taken, add the weight to the prediction.
         // Else, subtract the weight.
         if(ghr[i - 1] == 1){
@@ -425,7 +437,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
       return;
 
     case CUSTOM:
-      uint32_t perceptronIndex = HashPC(PC);
+      uint32_t perceptronIndex = HashPC(pc);
 
       // Update the perceptron table entry only if the threshold has not been
       // reached or the predicted and true outcomes disagree. Update the bias first, then the weights.
@@ -452,7 +464,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
         
       // Update the weights.
 
-      for(UINT32 i = 1; i < HIST_LEN + 1; i++){
+      for(uint32_t i = 1; i < HIST_LEN + 1; i++){
         // If the branch outcome matches the history bit, increment the weight value.
         // Else, decrement the weight value.
 
@@ -475,9 +487,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
       // update the GHR by shifting left and setting new bit.
       ghr = (ghr << 1);
       if(resolveDir == TAKEN){
-        ghr.set(0, 1);}
-      else{
-        ghr.set(0, 0);}
+        ghr++;}
       return;
 
     default:
