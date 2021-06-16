@@ -81,7 +81,7 @@ uint32_t HashPC(uint32_t pc){
 	
 	// Hash the PC so that it can be used as an index for the perceptron table.
 	uint32_t PCend = pc % TABLE_SIZE;
-	uint32_t ghrend = ((uint32_t)ghr.to_ulong()) % TABLE_SIZE;
+	uint32_t ghrend = ((unsigned long)*ghr) % TABLE_SIZE;
 	return PCend ^ ghrend;
 }
 // Initialize the predictor
@@ -465,7 +465,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
           else{
             perceptronTable[perceptronIndex][0]--;} 
         }
-        
+      }
       // Update the weights.
 
       for(uint32_t i = 1; i < HIST_LEN + 1; i++){
@@ -489,9 +489,9 @@ train_predictor(uint32_t pc, uint8_t outcome)
       }	   
 
       // update the GHR by shifting left and setting new bit.
-      ghr = (ghr << 1);
+      *ghr = (*ghr << 1);
       if(resolveDir == TAKEN){
-        ghr++;}
+        *ghr++;}
       return;
 
     default:
