@@ -88,6 +88,10 @@ init_predictor()
     //                          + 2^11 x 2  (Local PHT)
     //                          + 2^11 x 11 (Local BHT)
     //                          = 59392 bits < 64000 + 256 bits
+
+    #define TABLE_SIZE 1024 // Determined by threshold and history length
+    #define THRESHOLD  127 // Floor(1.93 * HIST_LEN + 14) as specified in paper
+    #define HIST_LEN   59 // Optimal value as determined by paper
   }
   gmask = make_mask(ghistoryBits);
   lmask = make_mask(lhistoryBits);
@@ -133,7 +137,7 @@ init_predictor()
         choice_pht[i] = 2;
       }
 
-    case CUSTOM:
+    case  TOURNAMENT2:
       // Local BHT
       size = 1<<pcIndexBits;
       local_bht = (uint32_t*) malloc(sizeof(uint32_t)*size);
@@ -163,8 +167,22 @@ init_predictor()
       {
         choice_pht[i] = 2;
       }
+
+    case CUSTOM:
+    // Given the history length and table size, construct the ghr
+    // and perceptron table.
+      perceptronSteps = 0;
+      ghr = bitset<HIST_LEN>();
+
+      // Initialize each entry in the perceptron table to a value of
+      // zero. Initialize number of steps executed for each perceptron to zero.
+
+      for(UINT32 i=0; i < TABLE_SIZE; i++){
+        for(UINT32 j=0; j < HIST_LEN; j++){
+          perceptronTable[i][j] = 0;
+        }
+      }
   }      
-  
 }
 
 // Make a prediction for conditional branch instruction at PC 'pc'
@@ -223,7 +241,7 @@ uint8_t make_prediction(uint32_t pc)
       else
         return NOTTAKEN;
 
-    case CUSTOM:
+    case TOURNAMENT2:
       pcbits = pc & gmask;
       histbits = ghist & gmask;
       index = histbits ^ pcbits;
@@ -242,6 +260,35 @@ uint8_t make_prediction(uint32_t pc)
         return TAKEN;
       else
         return NOTTAKEN;
+    
+    case CUSTOM:
+      uint32_t perceptronIndex = HashPC(pc);
+      uint32_t prediction = 0;
+
+      // Calculate prediction based on selected perceptron and global history.
+      // First add the bias, then all other weights.
+
+      prediction += perceptronTable[perceptronIndex][0]; 
+      for(UINT32 i=1; i < HIST_LEN + 1; i++){
+        // If history bit is taken, add the weight to the prediction.
+        // Else, subtract the weight.
+        if(ghr[i - 1] == 1){
+          prediction += perceptronTable[perceptronIndex][i];}
+        else{
+          prediction -= perceptronTable[perceptronIndex][i];}
+      }
+
+      // Update perceptron steps to absolute value of the prediction.
+
+      perceptronSteps = abs(prediction);
+
+      // If the prediction is negative, predict not taken. If it is positive,
+      // predict taken. Assume zero is positive.
+    
+    if(prediction >= 0){
+        return TAKEN;}
+    else{
+        return NOT_TAKEN;}  
 
     default:
       break;
@@ -335,7 +382,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
       ghist = ((ghist<<1) | outcome) & gmask;
       return;
 
-    case CUSTOM:
+    case TOURNAMENT2:
       pcbits = pc & gmask;
       histbits = ghist & gmask;
       index = histbits ^ pcbits;
@@ -375,6 +422,62 @@ train_predictor(uint32_t pc, uint8_t outcome)
       }
       local_bht[pcidx] = local_bht[pcidx]<<1 | outcome;
       ghist = ghist<<1 | outcome;
+      return;
+
+    case CUSTOM:
+      uint32_t perceptronIndex = HashPC(PC);
+
+      // Update the perceptron table entry only if the threshold has not been
+      // reached or the predicted and true outcomes disagree. Update the bias first, then the weights.
+      // Correct for overflow.
+
+      if(resolveDir != predDir || perceptronSteps <= THRESHOLD){
+        
+        // If the branch was taken, increment the bias value. Else, decrement it.
+
+        if(resolveDir == TAKEN){
+          int32_t updateVal = perceptronTable[perceptronIndex][0] + 1;
+          if (updateVal > 128){
+            perceptronTable[perceptronIndex][0] = 128;}
+          else{
+            perceptronTable[perceptronIndex][0]++;}
+        }
+        else{
+          int32_t updateVal = perceptronTable[perceptronIndex][0] - 1;
+          if (updateVal < -128){
+            perceptronTable[perceptronIndex][0] = -128;}
+          else{
+            perceptronTable[perceptronIndex][0]--;} 
+        }
+        
+      // Update the weights.
+
+      for(UINT32 i = 1; i < HIST_LEN + 1; i++){
+        // If the branch outcome matches the history bit, increment the weight value.
+        // Else, decrement the weight value.
+
+        if((resolveDir == TAKEN && ghr[i - 1] == 1) || (resolveDir == NOT_TAKEN && ghr[i - 1] == 0)){
+          int32_t updateVal = perceptronTable[perceptronIndex][i] + 1;
+          if (updateVal > THRESHOLD){
+          perceptronTable[perceptronIndex][i] = THRESHOLD;}
+          else{
+            perceptronTable[perceptronIndex][i]++;}
+        }
+        else{
+          int32_t updateVal = perceptronTable[perceptronIndex][i] - 1;
+          if (updateVal < THRESHOLD * (-1)){
+            perceptronTable[perceptronIndex][i] = THRESHOLD * (-1);}
+          else{
+            perceptronTable[perceptronIndex][i]--;}
+        }
+      }	   
+
+      // update the GHR by shifting left and setting new bit.
+      ghr = (ghr << 1);
+      if(resolveDir == TAKEN){
+        ghr.set(0, 1);}
+      else{
+        ghr.set(0, 0);}
       return;
 
     default:
